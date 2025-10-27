@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ចម្រៀងនៃការសរសើរ</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide Icon Core Library as Global Object -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Load Moul font for a distinct heading style -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Moul&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            /* Changed font to prioritize Noto Sans Khmer for better Khmer script rendering */
+            font-family: "Noto Sans Khmer", 'Inter', sans-serif;
+        }
+        
+        /* Apply Moul font specifically to the main title (h1 in header) */
+        header h1 {
+            font-family: 'Moul', "Noto Sans Khmer", 'Inter', sans-serif;
+            font-weight: 400; /* Moul is naturally bold, so set explicit font-weight to 400 */
+        }
+
+        .text-shadow-md {
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        /* Styles for the Modal/Content Viewer Popup and Confirmation Modal */
+        .modal {
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 60; 
+        }
+
+        /* --- Projector Mode Styles (New Feature) --- */
+        .projector-mode-active #song-modal {
+            background-color: #000 !important;
+            backdrop-filter: none !important;
+        }
+        .projector-mode-active #song-modal .modal-content-wrapper {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            background-color: #000 !important;
+        }
+
+        .projector-mode-active #modal-header,
+        .projector-mode-active #modal-footer,
+        .projector-mode-active #modal-controls {
+            display: none !important;
+        }
+        .projector-mode-active #content-container {
+            font-size: 3rem !important; /* Extra large font for projection */
+            line-height: 1.5;
+            background-color: #000 !important;
+            color: #fff !important; 
+            padding: 5vh 5vw !important; 
+            text-align: center;
+        }
+        /* Override default modal structure in projector mode */
+        .projector-mode-active #song-modal .modal-content-wrapper {
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-4 md:p-8">
+
+    <div id="app" class="max-w-4xl mx-auto">
+        
+        <!-- Header and Status (Title updated here) -->
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold text-blue-400 mb-2 text-shadow-md">
+                📝 ចម្រៀងនៃការសរសើរ (រួមគ្នា)
+            </h1>
+            <!-- Small Badge/Banner for Church Name -->
+            <div class="inline-block bg-yellow-500 text-gray-900 font-bold py-1 px-3 rounded-full text-sm shadow-md mb-4">
+                ព្រះវិហារមេតូឌីស្ទកងវ៉ា
+            </div>
+            <!-- Auth status now shows the full User ID (Mandatory for collaborative apps) -->
+            <p id="auth-status" class="text-sm text-gray-400 break-words">កំពុងផ្ទុកការកំណត់អ្នកប្រើប្រាស់...</p>
+        </header>
+
+        <!-- Form to Add New Song Content -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-white">
+                ➕ បន្ថែមខ្លឹមសារបទចម្រៀងថ្មី
+            </h2>
+            <div class="space-y-4">
+                <!-- Song Title Input -->
+                <input id="song-title" type="text" placeholder="ចំណងជើង (ឧ. សរសើរព្រះនៃយើង)" 
+                       class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-gray-400">
+                
+                <!-- Song Content Input -->
+                <textarea id="song-content" placeholder="ខ្លឹមសារបទចម្រៀង / ទំនុកច្រៀង" rows="5"
+                       class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-gray-400 resize-none"></textarea>
+
+                <!-- Add Song Button -->
+                <button id="add-song-btn" 
+                        class="w-full p-3 rounded-lg bg-blue-600 hover:bg-blue-700 transition duration-150 font-bold text-lg shadow-blue-500/50 shadow-md transform hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50"
+                        disabled>
+                    <span id="button-text">
+                        បន្ថែមបទចម្រៀង
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Current Song List and Search -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+                <h2 class="text-2xl font-semibold text-white flex items-center mb-4 md:mb-0">
+                    បញ្ជីទំនុកច្រៀងបច្ចុប្បន្ន 
+                    <span id="song-count" class="ml-3 text-base font-normal text-blue-400">(០ បទ)</span>
+                </h2>
+                <!-- Search Input -->
+                <div class="w-full md:w-1/2">
+                    <input id="search-input" type="text" placeholder="🔍 ស្វែងរកចំណងជើង..." 
+                           class="w-full p-2.5 rounded-lg bg-gray-700 border border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-gray-400">
+                </div>
+            </div>
+
+            <ul id="playlist-container" class="space-y-3">
+                <!-- Songs will be displayed here by JS -->
+                <li id="loading-item" class="text-center p-4 text-gray-400 italic">
+                    កំពុងផ្ទុកបញ្ជីទំនុកច្រៀង...
+                </li>
+            </ul>
+        </div>
+
+        <!-- Message Box (for notifications) -->
+        <div id="message-box" class="fixed bottom-5 right-5 z-50 transition-transform duration-300 transform translate-x-full">
+            <div id="message-content" class="p-4 rounded-lg shadow-xl text-white font-medium max-w-sm"></div>
+        </div>
+
+        <!-- Song Content Viewer Modal -->
+        <div id="song-modal" class="modal fixed inset-0 flex items-center justify-center p-4 hidden">
+            <!-- Modal Content Wrapper -->
+            <div class="modal-content-wrapper bg-gray-900 rounded-xl shadow-2xl p-6 w-full max-w-3xl h-[90vh] flex flex-col transform scale-95 transition-all duration-300">
+                
+                <!-- Modal Header (3. Show Contributor ID in Modal) -->
+                <div id="modal-header" class="flex justify-between items-start mb-4 flex-shrink-0">
+                    <div>
+                        <h3 id="modal-title" class="text-2xl font-bold text-white mb-1">ខ្លឹមសារបទចម្រៀង</h3>
+                        <p id="modal-author" class="text-sm text-gray-400"></p>
+                    </div>
+                    
+                    <button id="close-modal-btn" class="text-gray-400 hover:text-white p-2 rounded-full transition duration-150">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+
+                <!-- Content Display Area -->
+                <div id="content-container" class="flex-1 overflow-y-auto p-4 bg-gray-800 rounded-lg whitespace-pre-wrap text-xl leading-relaxed text-gray-200">
+                    <!-- Song lyrics/content will be injected here -->
+                </div>
+                
+                <!-- Modal Controls (1. Copy Lyrics Button & 2. Projector Mode Button) -->
+                <div id="modal-controls" class="flex justify-center space-x-4 mt-4 flex-shrink-0">
+                    <button id="copy-lyrics-btn" class="flex items-center p-3 rounded-lg bg-green-600 hover:bg-green-700 transition duration-150 font-bold text-sm shadow-md transform hover:scale-[1.05] active:scale-[0.95]">
+                        <i data-lucide="copy" class="w-5 h-5 mr-2"></i> ចម្លងទំនុកច្រៀង
+                    </button>
+                    <button id="projector-mode-btn" class="flex items-center p-3 rounded-lg bg-purple-600 hover:bg-purple-700 transition duration-150 font-bold text-sm shadow-md transform hover:scale-[1.05] active:scale-[0.95]">
+                        <i data-lucide="monitor-dot" class="w-5 h-5 mr-2"></i> របៀបដាក់បញ្ចាំង
+                    </button>
+                </div>
+                
+                <!-- Modal Footer -->
+                <p id="modal-footer" class="text-sm text-gray-500 mt-4 text-center flex-shrink-0">
+                    នេះគឺជាទំនុកច្រៀងដែលបានរក្សាទុក។
+                </p>
+            </div>
+        </div>
+
+        <!-- Confirmation Modal (New Feature) -->
+        <div id="confirm-modal" class="modal fixed inset-0 flex items-center justify-center p-4 hidden">
+            <div class="bg-gray-800 rounded-xl shadow-2xl p-8 w-full max-w-sm transform scale-95 transition-all duration-300">
+                <h3 class="text-xl font-bold text-red-400 mb-4">⚠️ បញ្ជាក់ការលុប</h3>
+                <p id="confirm-message" class="text-gray-300 mb-6">តើអ្នកប្រាកដជាចង់លុបទិន្នន័យនេះមែនទេ?</p>
+                <div class="flex justify-end space-x-4">
+                    <button id="cancel-confirm-btn" class="p-2.5 rounded-lg bg-gray-600 hover:bg-gray-700 transition duration-150 font-semibold text-white">
+                        បោះបង់
+                    </button>
+                    <button id="execute-confirm-btn" class="p-2.5 rounded-lg bg-red-600 hover:bg-red-700 transition duration-150 font-bold text-white">
+                        លុបចេញ
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Firebase Imports and Configuration -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, doc, addDoc, deleteDoc, onSnapshot, query, setLogLevel, serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ------------------------------------------------
+        // 1. Firebase Configuration (Mandatory Global Vars)
+        // ------------------------------------------------
+        setLogLevel('debug');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, userId = null;
+        let isAuthReady = false;
+        let allSongs = []; // Store all songs for local filtering
+
+        // Utility: Show Message Box
+        function showMessage(text, isError = false) {
+            const box = document.getElementById('message-box');
+            const content = document.getElementById('message-content');
+            
+            content.textContent = text;
+            content.className = `p-4 rounded-lg shadow-xl font-medium max-w-sm ${isError ? 'bg-red-600' : 'bg-green-600'}`;
+            
+            // Show box
+            box.classList.remove('translate-x-full');
+            box.classList.add('translate-x-0');
+
+            // Hide box after 3 seconds
+            setTimeout(() => {
+                box.classList.remove('translate-x-0');
+                box.classList.add('translate-x-full');
+            }, 3000);
+        }
+
+        // Utility: Format time difference
+        function timeAgo(date) {
+            if (!date) return 'មិនទាន់មានពេលវេលា';
+            const seconds = Math.floor((new Date() - date) / 1000);
+            
+            let interval = seconds / 31536000;
+            if (interval > 1) return Math.floor(interval) + " ឆ្នាំមុន";
+            
+            interval = seconds / 2592000;
+            if (interval > 1) return Math.floor(interval) + " ខែមុន";
+            
+            interval = seconds / 86400;
+            if (interval > 1) return Math.floor(interval) + "  ថ្ងៃមុន";
+            
+            interval = seconds / 3600;
+            if (interval > 1) return Math.floor(interval) + " ម៉ោងមុន";
+            
+            interval = seconds / 60;
+            if (interval > 1) return Math.floor(interval) + " នាទីមុន";
+            
+            return Math.floor(seconds) + " វិនាទីមុន";
+        }
+
+        // ------------------------------------------------
+        // 2. Initialization and Authentication
+        // ------------------------------------------------
+
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        
+        const authStatusEl = document.getElementById('auth-status');
+        const addSongBtn = document.getElementById('add-song-btn');
+        const buttonText = document.getElementById('button-text');
+        const searchInput = document.getElementById('search-input');
+        
+        // Song View Modal Elements
+        const songModal = document.getElementById('song-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const contentContainer = document.getElementById('content-container'); 
+        const modalAuthorEl = document.getElementById('modal-author');
+        const copyLyricsBtn = document.getElementById('copy-lyrics-btn');
+        const projectorModeBtn = document.getElementById('projector-mode-btn'); 
+        
+        // New Confirmation Modal Elements
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmMessage = document.getElementById('confirm-message');
+        const cancelConfirmBtn = document.getElementById('cancel-confirm-btn');
+        const executeConfirmBtn = document.getElementById('execute-confirm-btn');
+
+        // Use onAuthStateChanged to ensure Auth is complete
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                // MANDATORY: Show full user ID for collaboration
+                authStatusEl.textContent = `បានតភ្ជាប់ជា៖ ${userId}`;
+                isAuthReady = true;
+                addSongBtn.disabled = false;
+                buttonText.textContent = "បន្ថែមបទចម្រៀង";
+                console.log("Firebase Auth Ready. User ID:", userId);
+                if (db && userId) {
+                    listenToPlaylist();
+                }
+
+            } else {
+                try {
+                    await setPersistence(auth, browserSessionPersistence);
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("Auth Error:", error);
+                    authStatusEl.textContent = `មានបញ្ហា Auth: ${error.message}`;
+                }
+            }
+        });
+
+        // ------------------------------------------------
+        // 3. Content Viewer Modal Logic
+        // ------------------------------------------------
+
+        // Function to display song content in the modal
+        function viewContent(title, content, authorId) {
+            document.getElementById('modal-title').textContent = title;
+
+            const isAuthor = authorId === userId;
+            modalAuthorEl.textContent = `អ្នករួមចំណែក (ID): ${authorId} ${isAuthor ? '(ខ្ញុំ)' : ''}`;
+
+            contentContainer.textContent = content; 
+
+            songModal.classList.remove('hidden');
+        }
+
+        // Close modal function
+        function closeContentModal() {
+            songModal.classList.add('hidden');
+            contentContainer.textContent = '';
+            document.body.classList.remove('projector-mode-active');
+        }
+
+        // Attach close listeners for Song Modal
+        closeModalBtn.addEventListener('click', closeContentModal);
+        songModal.addEventListener('click', (e) => {
+            if (e.target === songModal) {
+                closeContentModal();
+            }
+        });
+        
+        // Copy Lyrics Functionality
+        copyLyricsBtn.addEventListener('click', () => {
+            const content = contentContainer.textContent;
+            if (content) {
+                const textArea = document.createElement("textarea");
+                textArea.value = content;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showMessage("បានចម្លងទំនុកច្រៀងទៅ Clipboard រួចរាល់!");
+                } catch (err) {
+                    console.error('Could not copy text: ', err);
+                    showMessage("មិនអាចចម្លងបានទេ។", true);
+                }
+                document.body.removeChild(textArea);
+            }
+        });
+        
+        // Projector Mode Functionality
+        projectorModeBtn.addEventListener('click', () => {
+            document.body.classList.toggle('projector-mode-active');
+            
+            if (document.body.classList.contains('projector-mode-active')) {
+                showMessage("បានចូលទៅក្នុងរបៀបដាក់បញ្ចាំង (Fullscreen)។ ចុច X ដើម្បីចេញ។");
+            } else {
+                showMessage("បានចេញពីរបៀបដាក់បញ្ចាំង។");
+            }
+        });
+
+        // ------------------------------------------------
+        // 4. Confirmation Modal Logic (New)
+        // ------------------------------------------------
+        
+        let currentConfirmAction = null;
+
+        // Function to show the custom confirmation modal
+        function showConfirmation(message, onConfirm) {
+            confirmMessage.textContent = message;
+            currentConfirmAction = onConfirm;
+            confirmModal.classList.remove('hidden');
+        }
+
+        // Function to hide the custom confirmation modal
+        function hideConfirmation() {
+            confirmModal.classList.add('hidden');
+            currentConfirmAction = null;
+        }
+
+        // Attach listeners for the confirmation modal
+        cancelConfirmBtn.addEventListener('click', hideConfirmation);
+        executeConfirmBtn.addEventListener('click', () => {
+            if (currentConfirmAction) {
+                currentConfirmAction();
+            }
+            hideConfirmation();
+        });
+
+        // Close confirmation if clicking the backdrop
+        confirmModal.addEventListener('click', (e) => {
+            if (e.target === confirmModal) {
+                hideConfirmation();
+            }
+        });
+
+        // ------------------------------------------------
+        // 5. Firestore Functions
+        // ------------------------------------------------
+
+        // Public Collection Path for Collaborative Use
+        const getPlaylistCollectionRef = (db) => 
+            collection(db, `artifacts/${appId}/public/data/playlist`);
+
+        // Function to Add Song
+        async function saveSong() {
+            if (!isAuthReady || !userId) {
+                showMessage("សូមរង់ចាំការតភ្ជាប់អ្នកប្រើប្រាស់...", true);
+                return;
+            }
+            
+            const titleInput = document.getElementById('song-title');
+            const contentInput = document.getElementById('song-content'); 
+            
+            const title = titleInput.value.trim();
+            const content = contentInput.value.trim(); 
+
+            if (title === "" || content === "") { 
+                showMessage("សូមបញ្ចូលចំណងជើងបទចម្រៀង និងខ្លឹមសារ!", true);
+                return;
+            }
+
+            try {
+                addSongBtn.disabled = true;
+                buttonText.textContent = "កំពុងរក្សាទុក...";
+                
+                const playlistRef = getPlaylistCollectionRef(db); // Use public ref
+                
+                await addDoc(playlistRef, {
+                    title: title,
+                    content: content, 
+                    authorId: userId, // Add author ID
+                    createdAt: serverTimestamp() 
+                });
+
+                showMessage(`បានបន្ថែមបទ៖ ${title} រួចរាល់!`); 
+                
+                // Clear form
+                titleInput.value = '';
+                contentInput.value = ''; 
+
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                showMessage("មានបញ្ហាក្នុងការបន្ថែមបទចម្រៀង! សូមមើល Console.", true);
+            } finally {
+                addSongBtn.disabled = false;
+                buttonText.textContent = "បន្ថែមបទចម្រៀង";
+            }
+        }
+
+        // Function to perform the actual deletion (called only after confirmation)
+        async function performDeleteSong(songId) {
+            if (!isAuthReady || !userId) return;
+
+            showMessage("កំពុងលុបទិន្នន័យ...", false); 
+
+            try {
+                const playlistRef = getPlaylistCollectionRef(db);
+                const docRef = doc(playlistRef, songId);
+                await deleteDoc(docRef);
+                showMessage("បានលុបបទចម្រៀងដោយជោគជ័យ!");
+            } catch (e) {
+                console.error("Error removing document: ", e);
+                showMessage("មានបញ្ហាក្នុងការលុបបទចម្រៀង!", true);
+            }
+        }
+
+        // Function to Render Playlist based on filter (search)
+        function renderPlaylist(songsToRender) {
+            const container = document.getElementById('playlist-container');
+            const songCountEl = document.getElementById('song-count');
+
+            container.innerHTML = ''; 
+
+            if (songsToRender.length === 0) {
+                container.innerHTML = `<li class="text-center p-4 text-gray-500 italic">
+                    មិនមានបទចម្រៀងដែលត្រូវនឹងការស្វែងរកទេ។
+                </li>`;
+            } else {
+                songsToRender.forEach(song => {
+                    const listItem = document.createElement('li');
+                    
+                    // Check if the current user is the author
+                    const isAuthor = song.authorId === userId;
+                    const hasContent = !!song.content;
+
+                    listItem.className = `flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition duration-150 border-l-4 border-blue-500 ${hasContent ? 'cursor-pointer' : ''}`;
+                    
+                    // Display author info (only showing a substring here for brevity on main list)
+                    const authorDisplay = song.authorId ? 
+                        `ដោយ៖ ${song.authorId.substring(0, 4)}... ${isAuthor ? '(ខ្ញុំ)' : ''}` : 'មិនស្គាល់';
+
+                    // Title and info block (clickable area)
+                    const titleInfoBlock = `
+                        <div class="flex-1 min-w-0 pr-4">
+                            <div class="flex items-center mb-2 md:mb-0">
+                                <!-- Using 'music' icon to represent a song/lyric sheet -->
+                                <i data-lucide="music" class="w-5 h-5 inline-block mr-3 ${hasContent ? 'text-yellow-400' : 'text-blue-400'}"></i>
+                                <p class="text-xl font-extrabold text-white truncate max-w-xs md:max-w-md">${song.title}</p>
+                            </div>
+                            <p class="text-xs text-gray-400 pl-8 md:pl-0">
+                                បានបន្ថែម៖ ${timeAgo(song.createdAt)} | ${authorDisplay}
+                            </p>
+                        </div>
+                    `;
+
+                    // Action buttons (ONLY delete button remains, shown only to author)
+                    const deleteButton = isAuthor ? `
+                        <button data-id="${song.id}" class="delete-btn text-red-400 hover:text-red-500 p-2 rounded-full transition duration-150 bg-gray-600 hover:bg-red-700 hover:text-white">
+                            <i data-lucide="trash-2" class="w-5 h-5"></i>
+                        </button>
+                    ` : `<span class="text-gray-500 text-sm italic pr-2"></span>`; 
+
+                    const actionButtons = `
+                        <div class="flex items-center space-x-2 mt-3 md:mt-0 flex-shrink-0">
+                            ${deleteButton}
+                        </div>
+                    `;
+
+                    // Combine HTML
+                    listItem.innerHTML = `${titleInfoBlock}${actionButtons}`;
+
+                    container.appendChild(listItem);
+                    
+                    // Attach click handler to the whole listItem for viewing content
+                    if (hasContent) {
+                        listItem.onclick = (e) => {
+                            // Check if the click originated from the delete button or its icon/path
+                            if (e.target.closest('.delete-btn')) {
+                                return;
+                            }
+                            // Pass the author ID for the modal display (New)
+                            viewContent(song.title, song.content, song.authorId); 
+                        };
+                    }
+                    
+                    // Attach Delete Listener (using confirmation modal)
+                    const deleteBtnEl = listItem.querySelector('.delete-btn');
+                    if (deleteBtnEl) {
+                        deleteBtnEl.onclick = () => {
+                            // Use showConfirmation instead of deleting directly
+                            const titleForConfirm = song.title.length > 30 ? song.title.substring(0, 30) + '...' : song.title;
+                            // UPDATED: Removed the longer phrase "ការលុបនេះមិនអាចយកមកវិញបានទេ។"
+                            showConfirmation(
+                                `តើអ្នកប្រាកដជាចង់លុបទិន្នន័យ "${titleForConfirm}" នេះមែនទេ?`, 
+                                () => performDeleteSong(song.id)
+                            );
+                        };
+                    }
+
+                });
+
+                // Re-render Lucide Icons
+                if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                    lucide.createIcons();
+                }
+            }
+            songCountEl.textContent = `(${allSongs.length} បទ)`;
+        }
+
+        // Main listener for Firebase data
+        function listenToPlaylist() {
+            const loadingItem = document.getElementById('loading-item');
+            if(loadingItem) loadingItem.remove(); 
+            
+            const playlistRef = getPlaylistCollectionRef(db); // Use public ref
+            
+            // Use onSnapshot to listen to real-time data changes
+            onSnapshot(query(playlistRef), (snapshot) => {
+                const fetchedSongs = [];
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    fetchedSongs.push({
+                        id: doc.id,
+                        title: data.title,
+                        content: data.content, 
+                        authorId: data.authorId || null, // Fetch author ID
+                        createdAt: data.createdAt?.toDate() 
+                    });
+                });
+                
+                // Store all songs and sort them
+                allSongs = fetchedSongs;
+                allSongs.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+
+                // Call render with the current search term
+                filterAndRenderPlaylist();
+
+            }, (error) => {
+                console.error("Error listening to playlist: ", error);
+                const container = document.getElementById('playlist-container');
+                container.innerHTML = `<li class="text-center p-4 text-red-400 font-bold">
+                    ⚠️ មិនអាចផ្ទុកទិន្នន័យបានទេ។ សូមពិនិត្យមើលការតភ្ជាប់ Firestore។
+                </li>`;
+                document.getElementById('song-count').textContent = `(មានបញ្ហា)`;
+            });
+        }
+        
+        // Function to filter songs based on search input
+        function filterAndRenderPlaylist() {
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            
+            let filteredSongs = allSongs;
+
+            if (searchTerm) {
+                filteredSongs = allSongs.filter(song => 
+                    song.title.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            renderPlaylist(filteredSongs);
+        }
+
+        // ------------------------------------------------
+        // 6. Attach Event Listeners
+        // ------------------------------------------------
+        document.getElementById('add-song-btn').addEventListener('click', saveSong);
+        
+        // Attach keyup listener for instant search filtering
+        searchInput.addEventListener('keyup', filterAndRenderPlaylist);
+
+    </script>
+</body>
+</html>
